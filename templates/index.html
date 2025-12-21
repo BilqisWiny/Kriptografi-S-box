@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-box Cryptography Analyzer</title>
+    <style>
+        /* Gaya CSS */
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #007bff; margin-bottom: 25px; }
+        .form-section, .results-section { background-color: #e9ecef; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 8px; color: #495057; }
+        input[type="file"] { display: block; width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; background: #fff; }
+        button { background-color: #28a745; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 15px; width: 100%; transition: background-color 0.3s; }
+        button:hover { background-color: #218838; }
+        .spinner { border: 4px solid rgba(0, 0, 0, 0.1); border-top: 4px solid #007bff; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 10px auto; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        #message { margin-top: 15px; padding: 10px; border-radius: 5px; text-align: center; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .table-results { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .table-results th, .table-results td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
+        .table-results th { background-color: #007bff; color: white; }
+        
+        /* Gaya untuk Status Kualitas */
+        .status-ideal { background-color: #a7f3d0; color: #065f46; font-weight: bold; padding: 4px 8px; border-radius: 4px; }
+        .status-baik { background-color: #fde68a; color: #92400e; padding: 4px 8px; border-radius: 4px; }
+        .status-kurang { background-color: #fecaca; color: #991b1b; padding: 4px 8px; border-radius: 4px; }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🔬 S-box Cryptography Analyzer</h1>
+    <p style="text-align: center; margin-bottom: 30px;">Unggah file **XLSX** S-box (256 nilai integer dalam satu baris atau kolom) untuk analisis properti kriptografi.</p>
+
+    <div class="form-section">
+        <h2>Unggah S-box</h2>
+        <form id="sboxForm">
+            <label for="sbox_file">Pilih File S-box (.xlsx):</label>
+            <input type="file" id="sbox_file" name="sbox_file" accept=".xlsx" required>
+            <button type="submit" id="submitBtn">Analisis S-box</button>
+        </form>
+        <div class="spinner" id="loadingSpinner"></div>
+        <div id="message"></div>
+    </div>
+
+    <div class="results-section" id="resultsSection" style="display: none;">
+        <h2>📊 Hasil Pengujian Kriptografi</h2>
+        <p><strong>Ukuran S-box:</strong> <span id="sboxSize"></span></p>
+        <table class="table-results">
+            <thead>
+                <tr>
+                    <th>Properti</th>
+                    <th>Nilai Uji</th>
+                    <th>Nilai Ideal (Target)</th>
+                    <th>Status Kualitas</th>
+                    <th>Keterangan</th>
+                </tr>
+            </thead>
+            <tbody id="resultsTableBody">
+                </tbody>
+        </table>
+    </div>
+
+</div>
+
+<script>
+    document.getElementById('sboxForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const fileInput = document.getElementById('sbox_file');
+        const messageDiv = document.getElementById('message');
+        const spinner = document.getElementById('loadingSpinner');
+        const submitBtn = document.getElementById('submitBtn');
+        const resultsSection = document.getElementById('resultsSection');
+        
+        // Reset tampilan
+        messageDiv.innerHTML = '';
+        messageDiv.className = '';
+        resultsSection.style.display = 'none';
+
+        if (fileInput.files.length === 0) {
+            messageDiv.className = 'error';
+            messageDiv.innerHTML = 'Mohon pilih file S-box.';
+            return;
+        }
+
+        // Tampilkan loading
+        spinner.style.display = 'block';
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'Menganalisis...';
+
+        const formData = new FormData();
+        formData.append('sbox_file', fileInput.files[0]);
+
+        try {
+            const response = await fetch('/analyze', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                messageDiv.className = 'success';
+                messageDiv.innerHTML = data.message;
+                displayResults(data.sbox_properties, data.sbox_size);
+            } else {
+                messageDiv.className = 'error';
+                messageDiv.innerHTML = `Gagal: ${data.message}`;
+            }
+
+        } catch (error) {
+            messageDiv.className = 'error';
+            messageDiv.innerHTML = `Terjadi kesalahan jaringan: ${error.message}`;
+        } finally {
+            spinner.style.display = 'none';
+            submitBtn.disabled = false;
+            submitBtn.innerText = 'Analisis S-box';
+        }
+    });
+
+    function getStatusClass(status) {
+        if (status.includes('SANGAT BAIK')) return 'status-ideal';
+        if (status.includes('Baik')) return 'status-baik';
+        if (status.includes('Kurang Baik')) return 'status-kurang';
+        return '';
+    }
+
+    function displayResults(properties, size) {
+        const body = document.getElementById('resultsTableBody');
+        const sizeSpan = document.getElementById('sboxSize');
+        body.innerHTML = '';
+        sizeSpan.innerText = size;
+
+        const propertyDescriptions = {
+            'NL': { name: 'Non-Linearity', ideal_desc: 'Setinggi mungkin (Max 112)' },
+            'SAC': { name: 'Strict Avalanche Criterion', ideal_desc: 'Sedekat mungkin dengan 0.5' },
+            'BIC_NL': { name: 'BIC-Non-Linearity', ideal_desc: 'NL tinggi pada kombinasi output' },
+            'BIC_SAC': { name: 'BIC-SAC', ideal_desc: 'Mendekati 0.5 pada kombinasi output' },
+            'LAP': { name: 'Linear Approx. Prob.', ideal_desc: 'Serendah mungkin (Min 0.0625)' },
+            'DAP': { name: 'Differential Approx. Prob.', ideal_desc: 'Serendah mungkin (Min 4)' },
+            'DU': { name: 'Differential Uniformity', ideal_desc: 'Serendah mungkin (Min 4)' },
+            'AD': { name: 'Algebraic Degree', ideal_desc: 'Setinggi mungkin (Max 7)' },
+            'TO': { name: 'Transparency Order', ideal_desc: 'Setinggi mungkin (Max 7)' },
+            'CI': { name: 'Correlation Immunity', ideal_desc: 'Setinggi mungkin (Max 7)' }
+        };
+
+        for (const key in properties) {
+            if (properties.hasOwnProperty(key)) {
+                const propData = properties[key];
+                const propInfo = propertyDescriptions[key] || { name: key, ideal_desc: '-' };
+                const statusClass = getStatusClass(propData.status);
+
+                const row = body.insertRow();
+                row.insertCell().innerHTML = `<strong>${propInfo.name}</strong> (${key})`;
+                
+                // Nilai Uji (dibuat string untuk mencegah masalah formatting)
+                row.insertCell().textContent = String(propData.value); 
+                
+                // Nilai Ideal (Target)
+                row.insertCell().textContent = String(propData.ideal); 
+
+                // Status Kualitas dengan styling
+                row.insertCell().innerHTML = `<span class="${statusClass}">${propData.status}</span>`; 
+
+                // Keterangan
+                row.insertCell().textContent = propInfo.ideal_desc;
+            }
+        }
+        document.getElementById('resultsSection').style.display = 'block';
+    }
+</script>
+
+</body>
+</html>
